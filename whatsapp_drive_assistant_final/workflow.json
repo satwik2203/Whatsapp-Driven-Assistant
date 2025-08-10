@@ -1,0 +1,98 @@
+{
+  "name": "WhatsApp-GDrive Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "whatsapp-in",
+        "method": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ],
+      "webhookId": "whatsapp-in"
+    },
+    {
+      "parameters": {
+        "functionCode": "const msg = $json[\"Body\"];\nconst from = $json[\"From\"];\n\nlet action = \"unknown\";\nlet args = [];\n\nif (msg.startsWith(\"LIST \")) {\n  action = \"list\";\n  args = [msg.substring(5)];\n} else if (msg.startsWith(\"DELETE \")) {\n  action = \"delete\";\n  args = [msg.substring(7)];\n} else if (msg.startsWith(\"MOVE \")) {\n  action = \"move\";\n  args = msg.substring(5).split(\" \");\n} else if (msg.startsWith(\"SUMMARY \")) {\n  action = \"summary\";\n  args = [msg.substring(8)];\n}\n\nreturn [{ json: { action, args, from, original: msg } }];\n"
+      },
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "url": "https://api.twilio.com/2010-04-01/Accounts={{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "options": {},
+        "method": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "From",
+              "value": "whatsapp:+14155238886"
+            },
+            {
+              "name": "To",
+              "value": "={{ $json[\"from\"] }}",
+              "type": "string"
+            },
+            {
+              "name": "Body",
+              "value": "Received command '{{ $json[\"action\"] }}' with args: {{ $json[\"args\"].join(', ') }}"
+            }
+          ]
+        }
+      },
+      "name": "Send Reply via Twilio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "twilio-creds",
+          "name": "Twilio Credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via Twilio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1"
+}
